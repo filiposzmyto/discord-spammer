@@ -12,6 +12,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 CONFIG_FILE = Path("config.json")
+ROOM_MARKER = "discord-spammer-managed-v1"
 DEFAULT_CONFIG = {
     "allowed_user_ids": [],
     "allowed_role_ids": [],
@@ -133,6 +134,7 @@ async def create_private_room(guild, user_ids, role_ids):
                     name=f"{channel_prefix}-{index}",
                     category=category,
                     overwrites=overwrites,
+                    topic=ROOM_MARKER,
                     reason="Private spam room channel",
                 )
             )
@@ -143,6 +145,57 @@ async def create_private_room(guild, user_ids, role_ids):
             await category.delete(reason="Cleaning up incomplete private spam room")
         raise
     return category, channels, members, roles
+
+
+async def stop_active_spam():
+    global spam_task
+    task = spam_task
+    if not task or task.done():
+        return False
+    task.cancel()
+    try:
+        await task
+    except asyncio.CancelledError:
+        pass
+    return True
+
+
+async def cleanup_managed_rooms(guild):
+    await stop_active_spam()
+    deleted_channels = 0
+    deleted_categories = 0
+    preserved_categories = 0
+
+    for category in list(guild.categories):
+        managed_channels = [
+            channel
+            for channel in category.channels
+            if isinstance(channel, discord.TextChannel) and channel.topic == ROOM_MARKER
+        ]
+        if not managed_channels:
+            continue
+
+        managed_ids = {channel.id for channel in managed_channels}
+        failed_channel_ids = set()
+        for channel in managed_channels:
+            try:
+                await channel.delete(reason="Cleaning up a managed spam room")
+                deleted_channels += 1
+            except (discord.Forbidden, discord.HTTPException) as error:
+                failed_channel_ids.add(channel.id)
+                logging.error("Nie udało się usunąć kanału %s: %s", channel.id, error)
+
+        remaining_channels = [channel for channel in category.channels if channel.id not in managed_ids]
+        if not remaining_channels and not failed_channel_ids:
+            try:
+                await category.delete(reason="Cleaning up an empty managed spam category")
+                deleted_categories += 1
+            except (discord.Forbidden, discord.HTTPException) as error:
+                logging.error("Nie udało się usunąć kategorii %s: %s", category.id, error)
+        else:
+            preserved_categories += 1
+
+    return deleted_channels, deleted_categories, preserved_categories
 
 
 def build_message(template, members, roles):
@@ -183,7 +236,7 @@ async def on_ready():
 
 @tree.command(name="spam", description="Włącz lub wyłącz prywatny pokój wiadomości")
 @app_commands.describe(
-    action="on = utwórz kanały i włącz, off = zatrzymaj wysyłanie",
+    action="on = utwórz kanały, off = zatrzymaj, cleanup = posprzątaj",
     message="Treść wiadomości; {mentions} zostanie zastąpione wybranymi wzmiankami",
     user="Osoba, która ma widzieć kanały i być oznaczona",
     user2="Druga osoba, która ma widzieć kanały i być oznaczona",
@@ -194,6 +247,7 @@ async def on_ready():
     action=[
         app_commands.Choice(name="On", value="on"),
         app_commands.Choice(name="Off", value="off"),
+        app_commands.Choice(name="Cleanup", value="cleanup"),
     ]
 )
 async def spam_command(
@@ -215,17 +269,44 @@ async def spam_command(
     global spam_task
     if action.value == "off":
         if spam_task and not spam_task.done():
-            spam_task.cancel()
+            await stop_active_spam()
             await interaction.response.send_message("🛑 Spam wyłączony. Kategoria i historia kanałów zostały zachowane.", ephemeral=True)
         else:
             await interaction.response.send_message("Spam jest już wyłączony.", ephemeral=True)
+        return
+
+    bot_member = interaction.guild.me
+    if action.value == "cleanup":
+        if not bot_member or not bot_member.guild_permissions.manage_channels:
+            await interaction.response.send_message("Bot potrzebuje uprawnienia Manage Channels do sprzątania.", ephemeral=True)
+            return
+        await interaction.response.defer(ephemeral=True)
+        try:
+            async with room_lock:
+                deleted_channels, deleted_categories, preserved_categories = await cleanup_managed_rooms(
+                    interaction.guild
+                )
+            preserved_note = (
+                f" Zachowano {preserved_categories} kategorii z innymi kanałami."
+                if preserved_categories
+                else ""
+            )
+            await interaction.edit_original_response(
+                content=(
+                    f"🧹 Usunięto {deleted_channels} kanałów i {deleted_categories} kategorii "
+                    f"utworzonych przez bota.{preserved_note}"
+                )
+            )
+        except (discord.Forbidden, discord.HTTPException):
+            await interaction.edit_original_response(
+                content="❌ Discord odrzucił sprzątanie. Sprawdź uprawnienie Manage Channels."
+            )
         return
 
     if spam_task and not spam_task.done():
         await interaction.response.send_message("Spam jest już włączony. Użyj `/spam` z opcją `Off`.", ephemeral=True)
         return
 
-    bot_member = interaction.guild.me
     if not bot_member or not all(
         (
             bot_member.guild_permissions.manage_channels,
