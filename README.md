@@ -1,69 +1,49 @@
-# Discord Spammer Bot
+# Discord private spam room bot
 
-Bot Discord z komendami `/spam on` i `/spam off`.
+Bot Discord z komendą `/spam`, która przy opcji `On` tworzy prywatną kategorię i do pięciu kanałów tekstowych. W każdym kanale wysyła tę samą wiadomość w serii ograniczonej do 20 partii, co około 0,5 sekundy. Opcja `Off` zatrzymuje wysyłanie, ale nie usuwa kategorii ani historii.
 
-Spamuje wiadomości **co 0.5 sekundy** na skonfigurowanym kanale z możliwością @mentionowania wybranych użytkowników i ról.
+Widoczność kanałów:
 
-## Funkcje
+- `@everyone` nie widzi kategorii ani kanałów;
+- widzą je tylko wybrane osoby i role;
+- bot ma dostęp potrzebny do wysyłania;
+- administratorzy Discorda nadal mogą widzieć kanały, ponieważ Discord omija dla nich ograniczenia widoczności.
 
-- `/spam on` – włącza spam
-- `/spam off` – wyłącza spam
-- `/spam_status` – sprawdza status
-- `/reload_config` – przeładowuje config bez restartu
-- Uprawnienia ograniczone do wybranych użytkowników / ról
-- Wiadomość konfigurowalna z `{mentions}`
+## Uruchomienie
 
-## Instalacja
+1. Utwórz aplikację bota w [Discord Developer Portal](https://discord.com/developers/applications).
+2. Dodaj sekret `DISCORD_BOT_TOKEN` w Replit albo zmienną `DISCORD_TOKEN` lokalnie.
+3. Zaproś bota przez OAuth2 z zakresami `bot` i `applications.commands`.
+4. Nadaj mu na serwerze: **Manage Channels**, **View Channels**, **Send Messages** oraz **Mention Everyone**, jeśli ma oznaczać niewzmiankowalne role.
+5. Zainstaluj zależności:
 
-1. Sklonuj repo:
-```bash
-git clone https://github.com/filiposzmyto/discord-spammer.git
-cd discord-spammer
-```
+   ```bash
+   pip install -r requirements.txt
+   ```
 
-2. Zainstaluj zależności:
-```bash
-pip install -r requirements.txt
-```
+6. Skopiuj `config.example.json` do `config.json` i uzupełnij opcjonalne wartości domyślne, a następnie uruchom:
 
-3. Skopiuj pliki konfiguracyjne:
-```bash
-cp .env.example .env
-cp config.example.json config.json
-```
+   ```bash
+   python bot.py
+   ```
 
-4. Uzupełnij `.env` tokenem bota i `config.json` swoimi ID.
+Na Replitu użyj workflow **Discord bot** (`python bot.py`).
 
-5. Uruchom:
-```bash
-python bot.py
-```
+## Komenda `/spam`
 
-## Konfiguracja (`config.json`)
+Wybierz `On` lub `Off`. Przy `On` możesz wskazać do dwóch osób i dwóch ról oraz podać własną wiadomość. Jeżeli nie wskażesz ich w komendzie, bot użyje `private_user_ids` i `private_role_ids` z `config.json` (a dla zgodności także `mention_user_ids` i `mention_role_ids`).
 
-| Pole | Opis |
-|------|------|
-| `spam_channel_id` | ID kanału, na który ma spamować |
-| `allowed_user_ids` | Lista ID użytkowników, którzy mogą używać komend |
-| `allowed_role_ids` | Lista ID ról, które mogą używać komend |
-| `mention_user_ids` | Lista ID użytkowników do @mentionowania |
-| `mention_role_ids` | Lista ID ról do @mentionowania |
-| `spam_message` | Treść wiadomości (`{mentions}` zostanie zastąpione) |
+Osoba uruchamiająca komendę musi mieć **Manage Server**, należeć do `allowed_user_ids`/`allowed_role_ids` albo być dopuszczona przez te ustawienia w konfiguracji. Drugi aktywny pokój na tym samym serwerze nie jest tworzony.
 
-## Uprawnienia bota
+`{mentions}` w wiadomości zostanie zastąpione wzmiankami wybranych osób i ról. Jeśli placeholdera nie ma, wzmianki zostaną dopisane na końcu. Limit chroni przed niekończącym się wysyłaniem i rate limitami Discorda.
 
-Bot potrzebuje:
-- Send Messages
-- Use Application Commands
-- Mention Everyone (jeśli chcesz mentionować role)
-- Server Members Intent (włącz w Developer Portal)
+## Konfiguracja
 
-## Uwagi
+`config.example.json` zawiera:
 
-- Discord **nie pozwala** na wiadomości widoczne tylko dla wybranych osób na publicznym kanale. Użyj prywatnego kanału.
-- Spam co 0.5s jest agresywny – Discord może nałożyć rate limit.
-- Nigdy nie commituj `.env` ani `config.json` z prawdziwymi danymi.
+- `allowed_user_ids`, `allowed_role_ids` — kto może sterować komendą;
+- `private_user_ids`, `private_role_ids` — osoby i role widzące prywatne kanały;
+- `spam_category_name`, `spam_channel_prefix` — nazwy kategorii i kanałów;
+- `spam_message`, `max_batches`, `interval_seconds` — wiadomość i limity.
 
-## Licencja
-
-MIT
+Nie commituj `config.json`, `.env` ani prawdziwego tokena.
