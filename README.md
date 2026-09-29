@@ -1,6 +1,6 @@
 # Discord private spam room bot
 
-Bot Discord z komendą `/spam`, która przy opcji `On` tworzy prywatną kategorię i do pięciu kanałów tekstowych. W każdym kanale wysyła tę samą wiadomość w serii ograniczonej do 20 partii, co około 0,5 sekundy. Opcja `Off` zatrzymuje wysyłanie, ale nie usuwa kategorii ani historii.
+Bot Discord z komendą `/spam`, która przy opcji `On` tworzy prywatną kategorię i do pięciu kanałów tekstowych. W każdym kanale wysyła tę samą wiadomość w serii ograniczonej do 20 partii, co około 0,5 sekundy. Opcja `Off` zatrzymuje wysyłanie, ale nie usuwa kategorii ani historii. Opcja `Cleanup` usuwa wyłącznie kanały oznaczone jako utworzone przez tego bota.
 
 Widoczność kanałów:
 
@@ -31,7 +31,7 @@ Na Replitu użyj workflow **Discord bot** (`python bot.py`).
 
 ## Komenda `/spam`
 
-Wybierz `On` lub `Off`. Przy `On` możesz wskazać do dwóch osób i dwóch ról oraz podać własną wiadomość. Jeżeli nie wskażesz ich w komendzie, bot użyje `private_user_ids` i `private_role_ids` z `config.json` (a dla zgodności także `mention_user_ids` i `mention_role_ids`).
+Wybierz `On`, `Off` albo `Cleanup`. Przy `On` możesz wskazać do dwóch osób i dwóch ról oraz podać własną wiadomość. Jeżeli nie wskażesz ich w komendzie, bot użyje `private_user_ids` i `private_role_ids` z `config.json` (a dla zgodności także `mention_user_ids` i `mention_role_ids`). `Cleanup` najpierw zatrzymuje aktywną serię, a potem usuwa oznaczone kanały i puste po nich kategorie; kategorii zawierających inne kanały nie usuwa.
 
 Osoba uruchamiająca komendę musi mieć **Manage Server**, należeć do `allowed_user_ids`/`allowed_role_ids` albo być dopuszczona przez te ustawienia w konfiguracji. Drugi aktywny pokój na tym samym serwerze nie jest tworzony.
 
