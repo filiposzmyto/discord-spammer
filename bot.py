@@ -115,13 +115,19 @@ async def resolve_visibility_overwrites(guild, user_ids, role_ids):
     return overwrites, members, selected_roles
 
 
-async def create_private_room(guild, user_ids, role_ids):
+async def create_private_room(guild, user_ids, role_ids, requested_channel_count=None):
     overwrites, members, roles = await resolve_visibility_overwrites(guild, user_ids, role_ids)
     category = None
     channels = []
     category_name = str(config["spam_category_name"])[:100]
     channel_prefix = str(config["spam_channel_prefix"])[:90]
-    channel_count = max(1, min(int(config["spam_channel_count"]), 5))
+    channel_count = max(
+        1,
+        min(
+            int(requested_channel_count or config["spam_channel_count"]),
+            5,
+        ),
+    )
     try:
         category = await guild.create_category(
             name=category_name,
@@ -206,11 +212,14 @@ def build_message(template, members, roles):
     return message or mentions or "Wiadomość testowa."
 
 
-async def send_batches(channels, content, allowed_mentions):
+async def send_batches(channels, content, allowed_mentions, requested_interval=None):
     global spam_task
     try:
         max_batches = max(1, min(int(config["max_batches"]), 20))
-        interval = max(0.5, float(config["interval_seconds"]))
+        interval = max(
+            0.5,
+            float(requested_interval if requested_interval is not None else config["interval_seconds"]),
+        )
         for batch in range(max_batches):
             await asyncio.gather(
                 *(channel.send(content, allowed_mentions=allowed_mentions) for channel in channels)
@@ -238,6 +247,8 @@ async def on_ready():
 @app_commands.describe(
     action="on = utwórz kanały, off = zatrzymaj, cleanup = posprzątaj",
     message="Treść wiadomości; {mentions} zostanie zastąpione wybranymi wzmiankami",
+    channels="Liczba prywatnych kanałów (od 1 do 5)",
+    speed="Odstęp między partiami w sekundach (minimum 0,5)",
     user="Osoba, która ma widzieć kanały i być oznaczona",
     user2="Druga osoba, która ma widzieć kanały i być oznaczona",
     role="Rola, która ma widzieć kanały i być oznaczona",
@@ -250,10 +261,13 @@ async def on_ready():
         app_commands.Choice(name="Cleanup", value="cleanup"),
     ]
 )
+@app_commands.rename(channels="channels", speed="speed")
 async def spam_command(
     interaction: discord.Interaction,
     action: app_commands.Choice[str],
     message: str | None = None,
+    channels: app_commands.Range[int, 1, 5] | None = None,
+    speed: app_commands.Range[float, 0.5, 60.0] | None = None,
     user: discord.Member | None = None,
     user2: discord.Member | None = None,
     role: discord.Role | None = None,
@@ -268,11 +282,36 @@ async def spam_command(
 
     global spam_task
     if action.value == "off":
-        if spam_task and not spam_task.done():
-            await stop_active_spam()
-            await interaction.response.send_message("🛑 Spam wyłączony. Kategoria i historia kanałów zostały zachowane.", ephemeral=True)
-        else:
-            await interaction.response.send_message("Spam jest już wyłączony.", ephemeral=True)
+        was_active = await stop_active_spam()
+        bot_member = interaction.guild.me
+        if not bot_member or not bot_member.guild_permissions.manage_channels:
+            status = "wyłączony" if was_active else "już wyłączony"
+            await interaction.response.send_message(
+                f"🛑 Spam {status}, ale automatyczne sprzątanie wymaga uprawnienia Manage Channels.",
+                ephemeral=True,
+            )
+            return
+        await interaction.response.defer(ephemeral=True)
+        try:
+            async with room_lock:
+                deleted_channels, deleted_categories, preserved_categories = await cleanup_managed_rooms(
+                    interaction.guild
+                )
+            preserved_note = (
+                f" Zachowano {preserved_categories} kategorii z innymi kanałami."
+                if preserved_categories
+                else ""
+            )
+            await interaction.edit_original_response(
+                content=(
+                    f"🛑 Spam wyłączony. Automatycznie usunięto {deleted_channels} kanałów "
+                    f"i {deleted_categories} kategorii.{preserved_note}"
+                )
+            )
+        except (discord.Forbidden, discord.HTTPException):
+            await interaction.edit_original_response(
+                content="🛑 Spam wyłączony, ale Discord odrzucił automatyczne sprzątanie."
+            )
         return
 
     bot_member = interaction.guild.me
@@ -338,6 +377,7 @@ async def spam_command(
                 interaction.guild,
                 user_ids,
                 role_ids,
+                channels,
             )
             template = (message or config["spam_message"])[:1800]
             content = build_message(template, members, roles)
@@ -347,7 +387,9 @@ async def spam_command(
                 everyone=False,
                 replied_user=False,
             )
-            spam_task = asyncio.create_task(send_batches(channels, content, allowed_mentions))
+            spam_task = asyncio.create_task(
+                send_batches(channels, content, allowed_mentions, speed)
+            )
             await interaction.edit_original_response(
                 content=(
                     f"✅ Utworzono kategorię **{category.name}** i {len(channels)} prywatnych kanałów. "
