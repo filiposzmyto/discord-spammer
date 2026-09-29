@@ -1,6 +1,8 @@
+node_modules/
 .env
-config.json
+.env.*
+!.env.example
+*.log
 __pycache__/
-*.pyc
-.venv/
-venv/
+config.json
+config.local.json
