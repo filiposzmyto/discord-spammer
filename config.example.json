@@ -1,8 +1,12 @@
 {
-  "spam_channel_id": 1234567890123456789,
-  "allowed_user_ids": [111111111111111111, 222222222222222222],
-  "allowed_role_ids": [333333333333333333],
-  "mention_user_ids": [111111111111111111],
-  "mention_role_ids": [333333333333333333],
-  "spam_message": "Hej {mentions}! To jest spam 🔥"
+  "allowed_user_ids": [111111111111111111],
+  "allowed_role_ids": [222222222222222222],
+  "private_user_ids": [333333333333333333],
+  "private_role_ids": [444444444444444444],
+  "spam_category_name": "spam-room",
+  "spam_channel_prefix": "spam",
+  "spam_channel_count": 5,
+  "spam_message": "Hej {mentions}! To jest wiadomość testowa.",
+  "max_batches": 20,
+  "interval_seconds": 0.5
 }
