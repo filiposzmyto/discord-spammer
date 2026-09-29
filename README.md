@@ -1,6 +1,6 @@
 # Discord private spam room bot
 
-Bot Discord z komendą `/spam`, która przy opcji `On` tworzy prywatną kategorię i do pięciu kanałów tekstowych. W każdym kanale wysyła tę samą wiadomość w serii ograniczonej do 20 partii, co około 0,5 sekundy. Opcja `Off` zatrzymuje wysyłanie, ale nie usuwa kategorii ani historii. Opcja `Cleanup` usuwa wyłącznie kanały oznaczone jako utworzone przez tego bota.
+Bot Discord z komendą `/spam`, która przy opcji `On` tworzy prywatną kategorię i od 1 do 5 kanałów tekstowych. W każdym kanale wysyła tę samą wiadomość w serii ograniczonej do 20 partii, z ustawianym odstępem od 0,5 sekundy. Opcja `Off` zatrzymuje wysyłanie i automatycznie sprząta pokój. Opcja `Cleanup` pozwala powtórzyć sprzątanie starych pokoi.
 
 Widoczność kanałów:
 
@@ -31,7 +31,7 @@ Na Replitu użyj workflow **Discord bot** (`python bot.py`).
 
 ## Komenda `/spam`
 
-Wybierz `On`, `Off` albo `Cleanup`. Przy `On` możesz wskazać do dwóch osób i dwóch ról oraz podać własną wiadomość. Jeżeli nie wskażesz ich w komendzie, bot użyje `private_user_ids` i `private_role_ids` z `config.json` (a dla zgodności także `mention_user_ids` i `mention_role_ids`). `Cleanup` najpierw zatrzymuje aktywną serię, a potem usuwa oznaczone kanały i puste po nich kategorie; kategorii zawierających inne kanały nie usuwa.
+Wybierz `On`, `Off` albo `Cleanup`. Przy `On` możesz ustawić `channels` od 1 do 5, `speed` od 0,5 sekundy, wskazać do dwóch osób i dwóch ról oraz podać własną wiadomość. Jeśli nie wskażesz osób/roli w komendzie, bot użyje `private_user_ids` i `private_role_ids` z `config.json` (a dla zgodności także `mention_user_ids` i `mention_role_ids`). `Off` zatrzymuje serię i automatycznie usuwa oznaczone kanały oraz puste kategorie; `Cleanup` robi to samo dla starych pokoi. Kategorii zawierających inne kanały bot nie usuwa.
 
 Osoba uruchamiająca komendę musi mieć **Manage Server**, należeć do `allowed_user_ids`/`allowed_role_ids` albo być dopuszczona przez te ustawienia w konfiguracji. Drugi aktywny pokój na tym samym serwerze nie jest tworzony.
 
@@ -44,6 +44,6 @@ Osoba uruchamiająca komendę musi mieć **Manage Server**, należeć do `allowe
 - `allowed_user_ids`, `allowed_role_ids` — kto może sterować komendą;
 - `private_user_ids`, `private_role_ids` — osoby i role widzące prywatne kanały;
 - `spam_category_name`, `spam_channel_prefix` — nazwy kategorii i kanałów;
-- `spam_message`, `max_batches`, `interval_seconds` — wiadomość i limity.
+- `spam_message`, `max_batches`, `interval_seconds` — wiadomość i wartości domyślne. Odstęp jest celowo ograniczony do minimum 0,5 sekundy, aby nie przeciążać Discorda.
 
 Nie commituj `config.json`, `.env` ani prawdziwego tokena.
